@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TextCoder</title>
+    <style>
+        textarea {
+            position: absolute;
+            width: 380px;
+            left: 35px;
+            overflow-x: hidden;
+            overflow-y: scroll;
+            border: solid black 1px;
+        }
+        button {
+            position: absolute;
+            width: 100px;
+            height: 60px;
+            left: 438px;
+        }
+        #text {
+            height: 100px;
+            top: 50px;
+        }
+        #butText {
+            top: 50px;
+        }
+        #gbk {
+            height: 200px;
+            top: 170px;
+        }
+        #butGBK {
+            top: 170px;
+        }
+        #gbkBuffer {
+            height: 200px;
+            top: 390px;
+        }
+        #butGBKBuffer {
+            top: 390px;
+        }
+        #unicode {
+            height: 200px;
+            top: 610px;
+        }
+        #butUnicode {
+            top: 610px;
+        }
+        #utf8Buffer {
+            height: 200px;
+            top: 830px;
+        }
+        #butUTF8Buffer {
+            top: 830px;
+        }
+        
+    </style>
+</head>
+
+<body>
+<div>
+<textarea id = "text"></textarea><button id = "butText">Text</button>
+<textarea id = "gbk"></textarea><button id = "butGBK">GBK</button>
+<textarea id = "gbkBuffer"></textarea><button id = "butGBKBuffer">GBK Buffer</button>
+<textarea id = "unicode"></textarea><button id = "butUnicode">Unicode</button>
+<textarea id = "utf8Buffer"></textarea><button id = "butUTF8Buffer">UTF8 Buffer</button>
+</div>
+<script src = "TextCoder.js"></script>
+<script>
+    function $(id) {return document.getElementById(id)}
+</script>
+<script>
+    $("butText").onclick = function() {
+        $("utf8Buffer").value = `${TextCoder.encode($("text").value, "utf-8")}`;
+        $("gbkBuffer").value = `${TextCoder.encode($("text").value, "GBK")}`;
+        $("gbk").value = `${TextCoder.string2Code($("text").value, "GBK")}`;
+        $("unicode").value = `${TextCoder.string2Code($("text").value, "Unicode")}`;
+    }
+
+    $("butGBKBuffer").onclick = function() {
+        let arr = $("gbkBuffer").value.split(",").map(v => v * 1),
+            utf8Buf = TextCoder.gbkBuffer2UTF8Buffer(new Uint8Array(arr));
+        $("gbkBuffer").value = `${arr}`;
+        $("utf8Buffer").value = `${utf8Buf}`;
+        $("text").value = `${TextCoder.decode(utf8Buf, "utf-8")}`;
+        $("gbk").value = `${TextCoder.string2Code($("text").value, "GBK")}`;
+        $("unicode").value = `${TextCoder.string2Code($("text").value, "Unicode")}`;
+    }
+    
+    $("butUTF8Buffer").onclick = function() {
+        let arr = $("utf8Buffer").value.split(",").map(v => v * 1),
+            gbkBuf = TextCoder.utf8Buffer2GBKBuffer(new Uint8Array(arr));
+        $("gbkBuffer").value = `${gbkBuf}`;
+        $("utf8Buffer").value = `${arr}`;
+        $("text").value = `${TextCoder.decode(gbkBuf, "GBK")}`;
+        $("gbk").value = `${TextCoder.string2Code($("text").value, "GBK")}`;
+        $("unicode").value = `${TextCoder.string2Code($("text").value, "Unicode")}`;
+    }
+    
+    $("butGBK").onclick = function() {
+        let arr = $("gbk").value.split(",").map(v => v * 1);
+        $("text").value = `${TextCoder.code2String(arr, "GBK")}`;
+        $("butText").onclick();
+    }
+    
+    $("butUnicode").onclick = function() {
+        let arr = $("unicode").value.split(",").map(v => v * 1);
+        $("text").value = `${TextCoder.code2String(arr, "utf-8")}`;
+        $("butText").onclick();
+    }
+</script>
+</body>
+
+</html>
