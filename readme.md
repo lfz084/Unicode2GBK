@@ -5,7 +5,6 @@ TextCoder.js 用Map映射编码表
 <script src = "TextCoder.js"></script>
 
 TextCoder_bin.js 用Uint32Array映射编码表，速度更快
-gbkMap.bin, unicodeMap.bin  编码映射表
 <script src = "TextCoder_bin.js"></script>
 
 decode

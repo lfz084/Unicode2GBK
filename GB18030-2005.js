@@ -221,23 +221,10 @@ try {
         Unicode2GBK_myMap = new myMap(Unicode2GBK_Uint32, getGBK);
     }
     
-    self.openFile = async function (url) {
-        return fetch(url)
-            .then(response => {
-                return response.blob();
-            })
-            .catch(() => {
-                console.error(`Error: openFile ${url}`);
-                return new Blob([]);
-            })
-    }
-    
-    self.loadArrayFile = async function (url) {
-        let blob = await openFile(url),
-            buffer = await blob.arrayBuffer(),
-            uint8 = new Uint8Array(buffer),
+    self.bufferToUint32Array = function(buffer) {
+        let uint8 = new Uint8Array(buffer),
             uint32 = new Uint32Array(uint8.length >>> 2);
-        for (i = 0, j = 0; i < uint8.length; i+=4) {
+        for (i = 0, j = 0; i < uint8.length; i += 4) {
             let uInt32 = uint8[i] | uint8[i + 1] << 8 | uint8[i + 2] << 16 | uint8[i + 3] << 24;
             uint32[j++] = uInt32;
         }

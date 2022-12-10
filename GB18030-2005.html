@@ -72,21 +72,40 @@
         <textarea id="gb18030"></textarea>
         <textarea id="unicode"></textarea>
         <textarea id="output"></textarea>
-        <button id="downloadGBK">download GBK2Unicode</button>
-        <button id="downloadUnicode">download Unicode2GBK</button>
-        <button id="compareGBK">compare GBK2Unicode</button>
-        <button id="compareUnicode">compare Unicode2GBK</button>
+        <button id="downloadGBK">download base64Map</button>
+        <button id="downloadUnicode">check base64Map</button>
         <button id="checkGBK2Unicode_Map">check GBK2Unicode</button>
         <button id="checkUnicode2GBK_Map">check Unicode2GBK</button>
     </div>
     <script src="GB18030-2005.js"></script>
+    <script src="buffer2Base64.js"></script>
+    <script src="base64.js"></script>
     <script src="saveFile.js"></script>
     <script>
         try {
             function $(id) { return document.getElementById(id) }
             
-            function saveTypeArray(typeArray, filename) {
-                save(new Blob([typeArray]), filename)
+            function saveBase64(filename) {
+                let text = `self.gbkMapBase64 = "${bufferToBase64String(GBK2Unicode_Uint32.buffer)}"\nself.unicodeMapBase64 = "${bufferToBase64String(Unicode2GBK_Uint32.buffer)}"`,
+                    uint8 = new Uint8Array([...text].map(char => char.charCodeAt(0)))
+                save(new Blob([uint8]), filename)
+            }
+            
+            function checkBase64Map() {
+                try{
+                let gbkBuffer = base64StringToBuffer(gbkMapBase64),
+                    unicodeBuffer = base64StringToBuffer(unicodeMapBase64),
+                    gbkMap = bufferToUint32Array(gbkBuffer),
+                    unicodeMap = bufferToUint32Array(unicodeBuffer),
+                    str = "",
+                    result = true;
+                gbkMap.map((v, i) => v != GBK2Unicode_Uint32[i] && (result = false))
+                str += `gbkBase64 ${result?"==":"!="}GBK2Unicode_Uint32\n`
+                result = true;
+                unicodeMap.map((v, i) => v != Unicode2GBK_Uint32[i] && (result = false))
+                str += `unicodBase64 ${result?"==":"!="}Unicode2GBK_Uint32\n`
+                alert(str)
+                }catch(e){alert(e.stack)}
             }
             
             document.body.onload = () => {
@@ -97,21 +116,11 @@
             }
             
             $("downloadGBK").onclick = () => {
-                saveTypeArray(GBK2Unicode_Uint32, "gbkMap.bin")
+                saveBase64("base64.js")
             }
             
             $("downloadUnicode").onclick = () => {
-                saveTypeArray(Unicode2GBK_Uint32, "unicodeMap.bin")
-            }
-            
-            $("compareGBK").onclick =async () => {
-                let u32 = await loadArrayFile("gbkMap.bin");
-                compare(u32, GBK2Unicode_Uint32) && alert("gbkMap.bin OK");
-            }
-            
-            $("compareUnicode").onclick = async () => {
-                let u32 = await loadArrayFile("unicodeMap.bin");
-                compare(u32, Unicode2GBK_Uint32) && alert("unicodeMap.bin OK");
+                checkBase64Map()
             }
             
             $("checkGBK2Unicode_Map").onclick = () => {
