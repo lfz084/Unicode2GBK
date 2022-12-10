@@ -1,81 +1,126 @@
 (function(global, factory) {
     (global = global || self, factory(global));
 }(this, (function(exports) {
-    try { 
+    try {
         let gbkDecoder = new TextDecoder("gb18030"),
-        utf8Decoder = new TextDecoder(),
-        encoder = new TextEncoder(),
-        GBK2Unicode = new Map(),
-        Unicode2GBK = new Map(),
-        char16bit = new Uint8Array(2),
-        char32bit = new Uint8Array(4),
-        uint32 = new Uint32Array(1);
-        
-    /*--------------- 用Map映射编码表 -----------------*/
-        
+            utf8Decoder = new TextDecoder(),
+            encoder = new TextEncoder(),
+            GBK2Unicode,
+            Unicode2GBK,
+            char16bit = new Uint8Array(2),
+            char32bit = new Uint8Array(4),
+            uint32 = new Uint32Array(1);
+
+        /*--------------- 用Uint32Array映射编码表，比Map映射快 -----------------*/
+
         function uInt(number) {
             uint32[0] = number;
             return uint32[0];
         }
 
-        function newChar(gbkCode, codePoint) {
-            if (codePoint == 65533) return;
-            GBK2Unicode.set(gbkCode, codePoint);
-            Unicode2GBK.set(codePoint, gbkCode);
+        self.openFile = async function(url) {
+            return fetch(url)
+                .then(response => {
+                    return response.blob();
+                })
+                .catch(() => {
+                    console.error(`Error: openFile ${url}`);
+                    return new Blob([]);
+                })
         }
 
-        function newChar8(i) {
-            newChar(i, i);
+        self.loadArrayFile = async function(url) {
+            let blob = await openFile(url),
+                buffer = await blob.arrayBuffer(),
+                uint8 = new Uint8Array(buffer),
+                uint32 = new Uint32Array(uint8.length >>> 2);
+            for (i = 0, j = 0; i < uint8.length; i += 4) {
+                let uInt32 = uint8[i] | uint8[i + 1] << 8 | uint8[i + 2] << 16 | uint8[i + 3] << 24;
+                uint32[j++] = uInt32;
+            }
+            return uint32;
         }
-
-        function newChar16(i, j) {
-            char16bit[0] = i;
-            char16bit[1] = j;
-            let char = gbkDecoder.decode(char16bit),
-                p = char.codePointAt();
-            newChar(i << 8 | j, p);
-        }
-
-        function newChar32(i, j, k, l) {
-            char32bit[0] = i;
-            char32bit[1] = j;
-            char32bit[2] = k;
-            char32bit[3] = l;
-            let char = gbkDecoder.decode(char32bit),
-                p = char.codePointAt();
-            newChar(uInt(i << 24 | j << 16 | k << 8 | l), p);
-        }
-        //0x00~0x7F
-        for (let i = 0; i <= 127; i++) { //128
-            newChar8(i);
-        }
-        //0x81~0xFE, 0x40~0xFE 
-        for (let i = 0x81; i <= 0xFE; i++) {
-            for (let j = 0x40; j <= 0xFE; j++) {
-                newChar16(i, j)
+        /*
+        ----------------Unicode2GBK_Uint32  Uint32Array--------------
+        codePoint               index               move
+        0~55295                 0~55295             0
+        57344~58852             55296~56804         -2048
+        58854~65535             56805~63486         -2049
+        128536~204135           63487~139086        -65049
+        ------------------------------------------------------
+        */
+        function getGBK(codePoint) {
+            if (codePoint <= 58852) {
+                if (codePoint <= 55295) return this.Uint32[codePoint];
+                else if (codePoint >= 57344) return this.Uint32[codePoint - 2048];
+            }
+            else if (codePoint >= 58854) {
+                if (codePoint <= 65535) return this.Uint32[codePoint - 2049];
+                else if (codePoint >= 128536) return this.Uint32[codePoint - 65049];
             }
         }
-        // 81~84,30~39,81~FE,30~39
-        for (let i = 0x81; i <= 0x84; i++) {
-            for (let j = 0x30; j <= 0x39; j++) {
-                for (let k = 0x81; k <= 0xFE; k++) {
-                    for (let l = 0x30; l <= 0x39; l++) {
-                        newChar32(i, j, k, l);
-                    }
-                }
-            }
-        }
-        // 95~9A,30~39,81~FE,30~39
-        for (let i = 0x95; i <= 0x9A; i++) {
-            for (let j = 0x30; j <= 0x39; j++) {
-                for (let k = 0x81; k <= 0xFE; k++) {
-                    for (let l = 0x30; l <= 0x39; l++) {
-                        newChar32(i, j, k, l);
-                    }
-                }
-            }
-        }
+        /*
+        ----------------GBK2Unicode_Uint32  Uint32Array--------------
+            编码范围                                    
+        0X00~0x7F
+        0x81~0xFE,0x40~0xFE
+        0x81~0x84,0x30~0x39,0x81~0xFE,0x30~0x39
+        0x95~0x9A,0x30~0x39,0x81~0xFE,0x30~0x39
         
+            gbkCode               index               move
+        0x00~0x7F                   0~127               0
+        0x8140~0xFEFE               128~24193           128
+        0x81308130~0x8439FE39       24194~74593         24194
+        0x95308130~0x9A39FE39       74594~150193        74594
+        ------------------------------------------------------
+        */
+        function getUnicode(gbkCode) {
+            if (gbkCode <= 0xFEFE) {
+                if (gbkCode >= 0x8140) {
+                    let i = gbkCode >> 8 & 0xFF,
+                        j = gbkCode & 0xFF;
+                    if (i >= 0x81 && i <= 0xFE && j >= 0x40 && j <= 0xFE) {
+                        let index = (i - 0x81) * 191 + j - 0x40 + 128;
+                        return this.Uint32[index];
+                    }
+                }
+                else if (gbkCode <= 0x7F) return gbkCode;
+            }
+            else if (gbkCode >= 0x81308130) {
+                if (gbkCode <= 0x8439FE39) {
+                    let i = gbkCode >> 24 & 0xFF,
+                        j = gbkCode >> 16 & 0xFF,
+                        k = gbkCode >> 8 & 0xFF,
+                        l = gbkCode & 0xFF;
+                    if (i >= 0x81 && i <= 0x84 && j >= 0x30 && j <= 0x39 &&
+                        k >= 0x81 && k <= 0xFE && l >= 0x30 && l <= 0x39)
+                    {
+                        let index = (i - 0x81) * 12600 + (j - 0x30) * 1260 + (k - 0x81) * 10 + (l - 0x30) + 24194;
+                        return this.Uint32[index];
+                    }
+                }
+                else if (gbkCode >= 0x95308130) {
+                    let i = gbkCode >> 24 & 0xFF,
+                        j = gbkCode >> 16 & 0xFF,
+                        k = gbkCode >> 8 & 0xFF,
+                        l = gbkCode & 0xFF;
+                    if (i >= 0x95 && i <= 0x9A && j >= 0x30 && j <= 0x39 &&
+                        k >= 0x81 && k <= 0xFE && l >= 0x30 && l <= 0x39)
+                    {
+                        let index = (i - 0x95) * 12600 + (j - 0x30) * 1260 + (k - 0x81) * 10 + (l - 0x30) + 74594;
+                        return this.Uint32[index];
+                    }
+                }
+            }
+        }
+
+        class myMap {
+            constructor(uint32, callback) {
+                this.Uint32 = uint32;
+                this.get = callback.bind(this);
+            }
+        }
+
         //U+ 0000 ~ U+ 007F: 0X XXXXXX
         //U+ 0080 ~ U+ 07FF: 110 XXXXX 10 XXXXXX
         //U+ 0800 ~ U+ FFFF: 1110 XXXX 10 XXXXXX 10 XXXXXX
@@ -196,7 +241,7 @@
                 GB2312: gbkDecoder,
                 GB18030: gbkDecoder,
                 "UTF-8": utf8Decoder
-             }
+            }
             encoding = encoding.toUpperCase();
             return (DECODER[encoding] || utf8Decoder).decode(buffer);
         }
@@ -229,7 +274,7 @@
                 let uCode = utf8Buffer[uStart++];
                 if (uCode < 0x0080) {
                     codeArr.push(uCode);
-                } 
+                }
                 else {
                     if (uCode < 0xE0) {
                         uCode = uCode << 8 | utf8Buffer[uStart++];
@@ -246,7 +291,7 @@
             }
             return codeArr;
         }
- 
+
         function code2String(codeArr, encoding = "Unicode") {
             const ISGBK = {
                 GBK: true,
@@ -265,7 +310,7 @@
                     buffer[len++] = code;
                 }
                 else if (ISGBK[encoding]) {
-                    if (code < 0xFFFF) {                        
+                    if (code < 0xFFFF) {
                         buffer[len++] = code >> 8 & 0xFF;
                         buffer[len++] = code & 0xFF;
                     }
@@ -279,7 +324,7 @@
                 else if (code < 0x0800) {
                     buffer[len++] = 0xC0 | (code >> 6 & 0x1F);
                     buffer[len++] = 0x80 | (code & 0x3F);
-                } 
+                }
                 else if (code < 0x10000) {
                     buffer[len++] = 0xE0 | (code >> 12 & 0x0F);
                     buffer[len++] = 0x80 | (code >> 6 & 0x3F);
@@ -298,17 +343,25 @@
         function autoEncoding(buffer) {
 
         }
-
-        exports.TextCoder = {
-            decode: decode,
-            encode: encode,
-            string2Code: string2Code,
-            code2String: code2String,
-            putUTF8Buffer: putUTF8Buffer,
-            putGBKBuffer: putGBKBuffer,
-            gbkBuffer2UTF8Buffer: gbkBuffer2UTF8Buffer,
-            utf8Buffer2GBKBuffer: utf8Buffer2GBKBuffer
+        
+        async function reset() {
+            let gbkUint32 = await loadArrayFile("gbkMap.bin"),
+                unicodeUint32 = await loadArrayFile("unicodeMap.bin");
+                GBK2Unicode = new myMap(gbkUint32, getUnicode);
+                Unicode2GBK = new myMap(unicodeUint32, getGBK);
+            exports.TextCoder = {
+                decode: decode,
+                encode: encode,
+                string2Code: string2Code,
+                code2String: code2String,
+                putUTF8Buffer: putUTF8Buffer,
+                putGBKBuffer: putGBKBuffer,
+                gbkBuffer2UTF8Buffer: gbkBuffer2UTF8Buffer,
+                utf8Buffer2GBKBuffer: utf8Buffer2GBKBuffer
+            }
         }
+        
+        reset();
     }
     catch (e) { alert(e.stack) }
 })))

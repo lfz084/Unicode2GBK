@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+    <style>
+        textarea {
+            position: absolute;
+            width: 380px;
+            height: 100px;
+            left: 15px;
+            overflow-x: hidden;
+            overflow-y: scroll;
+            border: solid black 1px;
+        }
+
+        button {
+            position: absolute;
+            width: 100px;
+            height: 38px;
+        }
+
+        #gb18030 {
+            top: 50px;
+        }
+
+        #unicode {
+            top: 180px;
+        }
+
+        #output {
+            height: 380px;
+            top: 310px;
+        }
+
+        #downloadGBK {
+            left: 75px;
+            top: 730px;
+        }
+
+        #downloadUnicode {
+            left: 235px;
+            top: 730px;
+        }
+        
+        #compareGBK {
+            left: 75px;
+            top: 800px;
+        }
+        
+        #compareUnicode {
+            left: 235px;
+            top: 800px;
+        }
+        
+        #checkGBK2Unicode_Map {
+            left: 75px;
+            top: 870px;
+        }
+        
+        #checkUnicode2GBK_Map {
+            left: 235px;
+            top: 870px;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <textarea id="gb18030"></textarea>
+        <textarea id="unicode"></textarea>
+        <textarea id="output"></textarea>
+        <button id="downloadGBK">download GBK2Unicode</button>
+        <button id="downloadUnicode">download Unicode2GBK</button>
+        <button id="compareGBK">compare GBK2Unicode</button>
+        <button id="compareUnicode">compare Unicode2GBK</button>
+        <button id="checkGBK2Unicode_Map">check GBK2Unicode</button>
+        <button id="checkUnicode2GBK_Map">check Unicode2GBK</button>
+    </div>
+    <script src="GB18030-2005.js"></script>
+    <script src="saveFile.js"></script>
+    <script>
+        try {
+            function $(id) { return document.getElementById(id) }
+            
+            function saveTypeArray(typeArray, filename) {
+                save(new Blob([typeArray]), filename)
+            }
+            
+            document.body.onload = () => {
+                createMap();
+                $("output").value = `${output}`;
+                $("gb18030").value = `${GBK2Unicode_Uint32.slice(0, 1024)}`;
+                $("unicode").value = `${Unicode2GBK_Uint32.slice(0, 1024)}`;
+            }
+            
+            $("downloadGBK").onclick = () => {
+                saveTypeArray(GBK2Unicode_Uint32, "gbkMap.bin")
+            }
+            
+            $("downloadUnicode").onclick = () => {
+                saveTypeArray(Unicode2GBK_Uint32, "unicodeMap.bin")
+            }
+            
+            $("compareGBK").onclick =async () => {
+                let u32 = await loadArrayFile("gbkMap.bin");
+                compare(u32, GBK2Unicode_Uint32) && alert("gbkMap.bin OK");
+            }
+            
+            $("compareUnicode").onclick = async () => {
+                let u32 = await loadArrayFile("unicodeMap.bin");
+                compare(u32, Unicode2GBK_Uint32) && alert("unicodeMap.bin OK");
+            }
+            
+            $("checkGBK2Unicode_Map").onclick = () => {
+                if(checkGBK2Unicode_Map()) testSpeedGBK2Unicode()
+                else alert(`Error\nGBK2Unicode_Map != GBK2Unicode_myMap`)
+            }
+            
+            $("checkUnicode2GBK_Map").onclick = () => {
+                if (checkUnicode2GBK_Map()) testSpeedUnicode2GBK()
+                else alert(`Error\nUnicode2GBK_Map != Unicode2GBK_myMap`)
+            }
+        } catch (e) { alert(e.stack) }
+    </script>
+</body>
+
+</html>
